@@ -1,75 +1,89 @@
 import RPi.GPIO as GPIO
 import time
 
-
-class MotorController:
-    #INT1_PIN=17, INT2_PIN=4, ENA_PIN=26, INT3_PIN=27, INT4_PIN=22, ENB_PIN=5
-    def __init__(self, enA=26, in1=4, in2=17, in3=27, in4=22, enB=5):
-        self.enA = enA
-        self.in1 = in1
-        self.in2 = in2
-        self.in3 = in3
-        self.in4 = in4
-        self.enB = enB
+class Motor:
+    def __init__(self, ENA=26, IN1=4, IN2=17, ENB=5, IN3=27, IN4=22):
+        self.ENA = ENA
+        self.ENB = ENB
+        self.IN1 = IN1
+        self.IN2 = IN2
+        self.IN3 = IN3
+        self.IN4 = IN4
 
         # Setup GPIO
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
-        GPIO.setup(self.enA, GPIO.OUT)
-        GPIO.setup(self.in1, GPIO.OUT)
-        GPIO.setup(self.in2, GPIO.OUT)
-        GPIO.setup(self.in3, GPIO.OUT)
-        GPIO.setup(self.in4, GPIO.OUT)
-        GPIO.setup(self.enB, GPIO.OUT)
+        GPIO.setup(self.ENA, GPIO.OUT)
+        GPIO.setup(self.ENB, GPIO.OUT)
+        GPIO.setup(self.IN1, GPIO.OUT)
+        GPIO.setup(self.IN2, GPIO.OUT)
+        GPIO.setup(self.IN3, GPIO.OUT)
+        GPIO.setup(self.IN4, GPIO.OUT)
 
-        # Create PWM objects
-        self.pwm_A = GPIO.PWM(self.enA, 100)  # PWM frequency: 100 Hz
-        self.pwm_B = GPIO.PWM(self.enB, 100)  # PWM frequency: 100 Hz
+        # Setup PWM
+        self.PWMA = GPIO.PWM(self.ENA, 100)
+        self.PWMB = GPIO.PWM(self.ENB, 100)
 
         # Start PWM
-        self.pwm_A.start(0)  # Initial speed: 0
-        self.pwm_B.start(0)  # Initial speed: 0
+        self.PWMA.start(0)
+        self.PWMB.start(0)
 
-    def move_forward(self, speed1, speed2):
-        GPIO.output(self.in1, GPIO.HIGH)
-        GPIO.output(self.in2, GPIO.LOW)
-        self.pwm_A.ChangeDutyCycle(speed1)
-
-        GPIO.output(self.in3, GPIO.LOW)
-        GPIO.output(self.in4, GPIO.HIGH)
-        self.pwm_B.ChangeDutyCycle(speed2)
-
-    def move_DC(self, speed):
-        # Giới hạn giá trị speed trong khoảng 0.0 đến 100.0
-        speed = max(0.0, min(100.0, speed))
-        GPIO.output(self.in1, GPIO.HIGH)
-        GPIO.output(self.in2, GPIO.LOW)
-        self.pwm_A.ChangeDutyCycle(speed)
-
-        GPIO.output(self.in3, GPIO.LOW)
-        GPIO.output(self.in4, GPIO.HIGH)
-        self.pwm_B.ChangeDutyCycle(speed)
-
+    # Forward motor
+    def move_forward(self, speed):
+        GPIO.output(self.IN1, GPIO.HIGH)
+        GPIO.output(self.IN2, GPIO.LOW)
+        GPIO.output(self.IN3, GPIO.LOW)
+        GPIO.output(self.IN4, GPIO.HIGH)
+        self.PWMA.ChangeDutyCycle(speed)
+        self.PWMB.ChangeDutyCycle(speed)
+    
+    # Stop motor
     def stop(self):
-        self.pwm_A.ChangeDutyCycle(0)
-        self.pwm_B.ChangeDutyCycle(0)
+        self.PWMA.ChangeDutyCycle(0)
+        self.PWMB.ChangeDutyCycle(0)
 
+    # Clear motor
     def cleanup(self):
         self.stop()
         GPIO.cleanup()
 
-# # Example usage:
+class Servo:
+    def __init__(self, INS=1):
+        self.INS = INS
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.INS, GPIO.OUT)
+
+        self.PWMS = GPIO.PWM(self.INS, 50)
+
+    def set_angle(self, angle):
+        duty_cycle = angle / 18.0 + 2.5
+        self.PWMS.start(0)
+        self.PWMS.ChangeDutyCycle(duty_cycle)
+        # time.sleep(0.01) 
+    
+    # Stop servo
+    def stop(self):
+        self.PWMS.stop()
+
+    # Clear servo
+    def cleanup(self):
+        GPIO.cleanup()
+
 if __name__ == "__main__":
-    motor_controller = MotorController()
+    motor_controller = Motor()
+    servo_motor = Servo()
 
     try:
         while True:
             # Assuming you have some PID control mechanism here to calculate speed_A and speed_B
-            speed_A = 100
-            speed_B = 100
+            speed_A = 50
+            speed_B = 50
 
-            motor_controller.move_DC(speed_A)
+            motor_controller.move_forward(speed_A)
+            servo_motor.set_angle(38) 
             time.sleep(0.1)
 
     except KeyboardInterrupt:
+        servo_motor.stop()
+        servo_motor.cleanup()
         motor_controller.cleanup()
