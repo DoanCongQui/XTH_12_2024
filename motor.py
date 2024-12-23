@@ -1,5 +1,21 @@
 import RPi.GPIO as GPIO
 import time
+import serial
+
+arduino_port = '/dev/ttyACM0' 
+baud_rate = 9600    
+
+# Connect Arduino
+try:
+    ser = serial.Serial(arduino_port, baud_rate, timeout=1)
+    print("Concect Arduino!")
+    time.sleep(2)
+except:
+    print("No Connect Arduino.")
+    exit()
+
+def send_command(command):
+        ser.write((command + '\n').encode())
 
 class Motor:
     def __init__(self, ENA=26, IN1=4, IN2=17, ENB=5, IN3=27, IN4=22):
@@ -47,43 +63,82 @@ class Motor:
         self.stop()
         GPIO.cleanup()
 
-class Servo:
-    def __init__(self, INS=1):
-        self.INS = INS
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.INS, GPIO.OUT)
+class Sensor:
+    def __init__(self):
+        pass
 
-        self.PWMS = GPIO.PWM(self.INS, 50)
+    def sensor(self, mt):
+        if ser.in_waiting > 0:
+            distance = ser.readline().decode('utf-8').strip()  
+            try:
+                distance = int(distance)  
+                s = "Khong co vat can"
+                if 0 < distance <= 25:  
+                    s = "Dung xe, co vat can"
+                    mt.stop()
+                else:
+                    s = "Khong co vat can"
+                    mt.move_forward(15)
+                return s, distance
+            
+            except ValueError:
+                print("Error")
 
-    def set_angle(self, angle):
-        duty_cycle = angle / 18.0 + 2.5
-        self.PWMS.start(0)
-        self.PWMS.ChangeDutyCycle(duty_cycle)
-        # time.sleep(0.01) 
+# class Servo:
+#     def __init__(self, INS=1):
+#         self.INS = INS
+#         GPIO.setmode(GPIO.BCM)
+#         GPIO.setup(self.INS, GPIO.OUT)
+
+#         self.PWMS = GPIO.PWM(self.INS, 50)
+
+#     def set_angle(self, angle):
+#         duty_cycle = angle / 18.0 + 2.5
+#         self.PWMS.start(0)
+#         self.PWMS.ChangeDutyCycle(duty_cycle)
+#         # time.sleep(0.01) 
     
-    # Stop servo
-    def stop(self):
-        self.PWMS.stop()
+#     # Stop servo
+#     def stop(self):
+#         self.PWMS.stop()
 
-    # Clear servo
-    def cleanup(self):
-        GPIO.cleanup()
+#     # Clear servo
+#     def cleanup(self):
+#         GPIO.cleanup()
+class Servo:
+    def __init__(self):
+        pass
+
+    def on(self, angle):
+        send_command(f"O {int(angle)}")
+        print("On Servo")
+
+    def stop(self):
+        send_command(f"S")
+        print("Stop Servo")
+
+def send_command(command):
+        ser.write((command + '\n').encode())
 
 if __name__ == "__main__":
     motor_controller = Motor()
     servo_motor = Servo()
+    sensor = Sensor()
 
     try:
         while True:
             # Assuming you have some PID control mechanism here to calculate speed_A and speed_B
-            speed_A = 50
-            speed_B = 50
+            # speed_A = 50
+            # speed_B = 50
 
-            motor_controller.move_forward(speed_A)
-            servo_motor.set_angle(38) 
+            # motor_controller.move_forward(speed_A)
+            s, d = sensor.sensor(motor_controller)
+            print(d)
+            print(s)
+            # servo_motor.servo(85) 
             time.sleep(0.1)
 
     except KeyboardInterrupt:
         servo_motor.stop()
-        servo_motor.cleanup()
+        # servo_motor.cleanup()
         motor_controller.cleanup()
